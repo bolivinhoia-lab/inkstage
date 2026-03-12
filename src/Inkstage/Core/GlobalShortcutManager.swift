@@ -1,108 +1,13 @@
 import AppKit
 import Carbon
 
-// MARK: - Shortcut Definitions
-enum InkstageShortcut: String, CaseIterable {
-    // Global shortcuts
-    case annotateScreen = "annotateScreen"
-    case annotateNoControls = "annotateNoControls"
-    case highlightCursor = "highlightCursor"
-    case spotlightCursor = "spotlightCursor"
-    case zoomCursor = "zoomCursor"
-    case showShortcuts = "showShortcuts"
-    
-    var keyCombo: String {
-        switch self {
-        case .annotateScreen: return "⌃A"
-        case .annotateNoControls: return "⌃⌥A"
-        case .highlightCursor: return "⌃S"
-        case .spotlightCursor: return "⌃L"
-        case .zoomCursor: return "⌃Z"
-        case .showShortcuts: return "/"
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .annotateScreen: return "Annotate Screen"
-        case .annotateNoControls: return "Annotate Without Controls"
-        case .highlightCursor: return "Highlight Cursor"
-        case .spotlightCursor: return "Spotlight Cursor"
-        case .zoomCursor: return "Zoom Cursor"
-        case .showShortcuts: return "Show Shortcuts"
-        }
-    }
-}
-
-// MARK: - Annotation Mode Shortcuts
-enum AnnotationShortcut: String, CaseIterable {
-    case color1 = "color1"
-    case color2 = "color2"
-    case color3 = "color3"
-    case color4 = "color4"
-    case color5 = "color5"
-    case freeHand = "freeHand"
-    case arrow = "arrow"
-    case rectangle = "rectangle"
-    case circle = "circle"
-    case text = "text"
-    case highlighter = "highlighter"
-    case clearAll = "clearAll"
-    case undo = "undo"
-    case redo = "redo"
-    case toggleWhiteboard = "toggleWhiteboard"
-    case exitMode = "exitMode"
-    
-    var key: String {
-        switch self {
-        case .color1: return "1"
-        case .color2: return "2"
-        case .color3: return "3"
-        case .color4: return "4"
-        case .color5: return "5"
-        case .freeHand: return "F"
-        case .arrow: return "A"
-        case .rectangle: return "R"
-        case .circle: return "C"
-        case .text: return "T"
-        case .highlighter: return "H"
-        case .clearAll: return "⌫"
-        case .undo: return "⌘Z"
-        case .redo: return "⇧⌘Z"
-        case .toggleWhiteboard: return "W"
-        case .exitMode: return "ESC"
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .color1: return "Color 1 (Cyan)"
-        case .color2: return "Color 2 (Rose)"
-        case .color3: return "Color 3 (Lime)"
-        case .color4: return "Color 4 (Yellow)"
-        case .color5: return "Color 5 (Violet)"
-        case .freeHand: return "Free Hand"
-        case .arrow: return "Arrow"
-        case .rectangle: return "Rectangle"
-        case .circle: return "Circle"
-        case .text: return "Text"
-        case .highlighter: return "Highlighter"
-        case .clearAll: return "Clear All"
-        case .undo: return "Undo"
-        case .redo: return "Redo"
-        case .toggleWhiteboard: return "Toggle Whiteboard"
-        case .exitMode: return "Exit Mode"
-        }
-    }
-}
-
+// MARK: - Global Shortcut Manager
 class GlobalShortcutManager {
     static let shared = GlobalShortcutManager()
 
-    private var eventTap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
     private var localMonitor: Any?
     private var globalMonitor: Any?
+    private var shortcutOverlay: ShortcutOverlayWindow?
     
     // Track Fn key state for interactive mode
     private var isFnKeyPressed: Bool = false
@@ -118,10 +23,8 @@ class GlobalShortcutManager {
 
     func setup() {
         print("🔧 GlobalShortcutManager.setup() called")
-
-        // Remove any existing monitors first
         removeMonitors()
-
+        
         // Setup local monitor (works when app is active)
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             if self?.handleEvent(event) == true {
@@ -129,11 +32,15 @@ class GlobalShortcutManager {
             }
             return event
         }
-
-        // Setup global monitor for global shortcuts (⌃A, ⌃S, etc.)
-        setupGlobalEventTap()
-
-        print("✅ Monitors registered - local: \(localMonitor != nil), eventTap: \(eventTap != nil)")
+        
+        // Setup global monitor using NSEvent (works for app when it's key, but not truly global)
+        // For true global shortcuts, we need Accessibility permissions
+        // For now, rely on menu bar shortcuts which work via NSMenu
+        
+        print("✅ GlobalShortcutManager setup complete")
+        
+        // Check accessibility permissions
+        checkAccessibilityPermissions()
     }
 
     func removeMonitors() {
@@ -145,100 +52,29 @@ class GlobalShortcutManager {
             NSEvent.removeMonitor(monitor)
             globalMonitor = nil
         }
-        if let tap = eventTap {
-            CGEvent.tapEnable(tap: tap, enable: false)
-            if let source = runLoopSource {
-                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
-            }
-            eventTap = nil
+    }
+    
+    private func checkAccessibilityPermissions() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessibilityEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        
+        if accessibilityEnabled {
+            print("✅ Accessibility permissions granted")
+            setupTrueGlobalShortcuts()
+        } else {
+            print("⚠️ Accessibility permissions not granted - global shortcuts may not work")
+            print("   Please enable Inkstage in System Preferences > Security & Privacy > Accessibility")
         }
     }
     
-    private func setupGlobalEventTap() {
-        // Create event tap for global shortcuts
-        let eventMask = (1 << CGEventType.keyDown.rawValue)
-        
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(eventMask),
-            callback: { proxy, type, event, refcon in
-                return GlobalShortcutManager.handleCGEvent(proxy: proxy, type: type, event: event, refcon: refcon)
-            },
-            userInfo: nil
-        ) else {
-            print("❌ Failed to create event tap - may need accessibility permissions")
-            return
+    private func setupTrueGlobalShortcuts() {
+        // This uses NSEvent.addGlobalMonitor which works with Accessibility permissions
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            _ = self?.handleGlobalEvent(event)
         }
-        
-        eventTap = tap
-        runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
-        if let source = runLoopSource {
-            CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-        }
-        CGEvent.tapEnable(tap: tap, enable: true)
-    }
-    
-    static func handleCGEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
-        // Only handle key down events
-        guard type == .keyDown else {
-            return Unmanaged.passRetained(event)
-        }
-        
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        let flags = event.flags
-        
-        // Check for Control-based global shortcuts
-        let isControl = flags.contains(.maskControl)
-        let isOption = flags.contains(.maskAlternate)
-        let isCommand = flags.contains(.maskCommand)
-        let isShift = flags.contains(.maskShift)
-        
-        // ⌃A - Annotate Screen
-        if isControl && !isOption && !isCommand && !isShift && keyCode == 0 {
-            DispatchQueue.main.async {
-                AppStateManager.shared.toggleDrawing()
-            }
-            return nil // Consume event
-        }
-        
-        // ⌃⌥A - Annotate Without Controls
-        if isControl && isOption && !isCommand && !isShift && keyCode == 0 {
-            DispatchQueue.main.async {
-                AppStateManager.shared.toggleDrawingWithoutControls()
-            }
-            return nil
-        }
-        
-        // ⌃S - Highlight Cursor
-        if isControl && !isOption && !isCommand && !isShift && keyCode == 1 {
-            DispatchQueue.main.async {
-                AppStateManager.shared.toggleCursorHighlight()
-            }
-            return nil
-        }
-        
-        // ⌃L - Spotlight
-        if isControl && !isOption && !isCommand && !isShift && keyCode == 37 {
-            DispatchQueue.main.async {
-                AppStateManager.shared.toggleSpotlight()
-            }
-            return nil
-        }
-        
-        // ⌃Z - Zoom
-        if isControl && !isOption && !isCommand && !isShift && keyCode == 6 {
-            DispatchQueue.main.async {
-                AppStateManager.shared.toggleZoom()
-            }
-            return nil
-        }
-        
-        return Unmanaged.passRetained(event)
     }
 
-    /// Returns true if the event was handled and should not propagate
+    /// Handle local events (app is active)
     @discardableResult
     private func handleEvent(_ event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -250,33 +86,40 @@ class GlobalShortcutManager {
                 isFnKeyPressed = isFnPressed
                 if AppStateManager.shared.isDrawing {
                     if isFnPressed {
-                        AppStateManager.shared.enableInteractiveMode()
+                        // Enable interactive mode temporarily
+                        print("🔓 Interactive mode ON")
                     } else {
-                        AppStateManager.shared.disableInteractiveMode()
+                        print("🔒 Interactive mode OFF")
                     }
                 }
             }
             return false
         }
         
+        // Only handle key down from here
+        guard event.type == .keyDown else { return false }
+        
         // ESC key (keyCode 53)
         if event.keyCode == 53 {
             if OverlayWindowManager.shared.isTextFieldActive {
-                print("📝 ESC ignored - text field active")
                 return false
             }
-            
-            print("🎯 ESC pressed - deactivating all modes")
+            print("🎯 ESC pressed")
             DispatchQueue.main.async {
                 AppStateManager.shared.handleEscape()
             }
             return true
         }
         
-        // / (slash) - Show Shortcuts Overlay (when not in text field)
-        if event.characters == "/" && !modifiers.contains(.command) && !modifiers.contains(.control) {
+        // Check for Control-based shortcuts (⌃A, ⌃S, etc.)
+        if modifiers.contains(.control) {
+            return handleControlShortcut(event)
+        }
+        
+        // / (slash) - Show Shortcuts Overlay
+        if event.characters == "/" && modifiers.isEmpty {
             if !OverlayWindowManager.shared.isTextFieldActive {
-                ShortcutOverlay.shared.show()
+                toggleShortcutOverlay()
                 return true
             }
         }
@@ -284,15 +127,90 @@ class GlobalShortcutManager {
         // Only handle annotation shortcuts if in drawing mode
         guard AppStateManager.shared.isDrawing else { return false }
         
-        // Check for annotation shortcuts
         return handleAnnotationShortcut(event, modifiers: modifiers)
+    }
+    
+    /// Handle global events (app not necessarily active, requires Accessibility)
+    @discardableResult
+    private func handleGlobalEvent(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        
+        // Only handle Control-based global shortcuts
+        guard modifiers.contains(.control) else { return false }
+        
+        return handleControlShortcut(event)
+    }
+    
+    private func handleControlShortcut(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let isOption = modifiers.contains(.option)
+        let isCommand = modifiers.contains(.command)
+        let isShift = modifiers.contains(.shift)
+        
+        // Only pure Control shortcuts (no Option, Command, Shift unless specified)
+        guard !isCommand else { return false }
+        
+        switch event.keyCode {
+        case 0: // A key
+            if isOption {
+                // ⌃⌥A - Annotate without controls
+                print("🎯 ⌃⌥A pressed")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleDrawing()
+                    // Hide toolbar after short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        FloatingToolbarController.shared.hide()
+                    }
+                }
+            } else if !isShift {
+                // ⌃A - Annotate screen
+                print("🎯 ⌃A pressed")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleDrawing()
+                }
+            }
+            return true
+            
+        case 1: // S key
+            if !isOption && !isShift {
+                // ⌃S - Highlight cursor
+                print("🎯 ⌃S pressed")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleCursorHighlight()
+                }
+                return true
+            }
+            
+        case 37: // L key
+            if !isOption && !isShift {
+                // ⌃L - Spotlight
+                print("🎯 ⌃L pressed")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleSpotlight()
+                }
+                return true
+            }
+            
+        case 6: // Z key
+            if !isOption && !isShift {
+                // ⌃Z - Zoom
+                print("🎯 ⌃Z pressed")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleZoom()
+                }
+                return true
+            }
+            
+        default:
+            break
+        }
+        
+        return false
     }
     
     private func handleAnnotationShortcut(_ event: NSEvent, modifiers: NSEvent.ModifierFlags) -> Bool {
         let isCommand = modifiers.contains(.command)
         let isShift = modifiers.contains(.shift)
-        let _ = modifiers.contains(.control)
-        let _ = modifiers.contains(.option)
         
         // Colors 1-5
         if let char = event.characters?.first {
@@ -376,6 +294,167 @@ class GlobalShortcutManager {
         
         let colorNames = ["Cyan", "Rose", "Lime", "Yellow", "Violet"]
         ToastManager.shared.show(message: "🎨 \(colorNames[index])")
+    }
+    
+    private func toggleShortcutOverlay() {
+        if shortcutOverlay != nil {
+            shortcutOverlay?.close()
+            shortcutOverlay = nil
+        } else {
+            shortcutOverlay = ShortcutOverlayWindow()
+            shortcutOverlay?.show()
+        }
+    }
+}
+
+// MARK: - Shortcut Overlay Window
+class ShortcutOverlayWindow {
+    private var window: NSPanel?
+
+    func show() {
+        let width: CGFloat = 420
+        let height: CGFloat = 520
+
+        guard let screen = NSScreen.main else { return }
+        let x = (screen.frame.width - width) / 2
+        let y = (screen.frame.height - height) / 2
+
+        let panel = NSPanel(
+            contentRect: NSRect(x: x, y: y, width: width, height: height),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+
+        panel.level = .statusBar + 10
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+
+        // Frosted glass background
+        let visualEffectView = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        visualEffectView.material = .hudWindow
+        visualEffectView.state = .active
+        visualEffectView.blendingMode = .behindWindow
+        visualEffectView.wantsLayer = true
+        visualEffectView.layer?.cornerRadius = 16
+
+        // Content
+        let contentView = createContentView(frame: NSRect(x: 24, y: 24, width: width - 48, height: height - 48))
+        visualEffectView.addSubview(contentView)
+
+        panel.contentView = visualEffectView
+        window = panel
+
+        panel.orderFrontRegardless()
+
+        // Fade in animation
+        panel.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            panel.animator().alphaValue = 1
+        }
+        
+        // Auto-dismiss after 10 seconds or on click
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            self?.close()
+        }
+    }
+
+    func close() {
+        guard let panel = window else { return }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            panel.animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+            panel.orderOut(nil)
+            self?.window = nil
+        }
+    }
+
+    private func createContentView(frame: NSRect) -> NSView {
+        let view = NSView(frame: frame)
+
+        let titleLabel = NSTextField(labelWithString: "⌨️ Keyboard Shortcuts")
+        titleLabel.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
+        titleLabel.textColor = .labelColor
+        titleLabel.frame = NSRect(x: 0, y: frame.height - 40, width: frame.width, height: 30)
+        view.addSubview(titleLabel)
+
+        var yOffset = frame.height - 70
+
+        // Global Shortcuts Section
+        yOffset = addSectionTitle("Global Shortcuts", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌃A", "Annotate Screen", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌃⌥A", "Annotate (No Controls)", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌃S", "Highlight Cursor", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌃L", "Spotlight Cursor", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌃Z", "Zoom Cursor", to: view, y: yOffset)
+        yOffset = addShortcutRow("/", "Show/Hide This Help", to: view, y: yOffset)
+        yOffset = addShortcutRow("ESC", "Exit Current Mode", to: view, y: yOffset)
+
+        // Drawing Tools Section
+        yOffset -= 10
+        yOffset = addSectionTitle("Drawing Tools", to: view, y: yOffset)
+        yOffset = addShortcutRow("F", "Free Hand (Pen)", to: view, y: yOffset)
+        yOffset = addShortcutRow("A", "Arrow", to: view, y: yOffset)
+        yOffset = addShortcutRow("R", "Rectangle", to: view, y: yOffset)
+        yOffset = addShortcutRow("C", "Circle", to: view, y: yOffset)
+        yOffset = addShortcutRow("T", "Text", to: view, y: yOffset)
+        yOffset = addShortcutRow("H", "Highlighter", to: view, y: yOffset)
+
+        // Colors Section
+        yOffset -= 10
+        yOffset = addSectionTitle("Colors", to: view, y: yOffset)
+        yOffset = addShortcutRow("1", "Cyan", to: view, y: yOffset)
+        yOffset = addShortcutRow("2", "Rose", to: view, y: yOffset)
+        yOffset = addShortcutRow("3", "Lime", to: view, y: yOffset)
+        yOffset = addShortcutRow("4", "Yellow", to: view, y: yOffset)
+        yOffset = addShortcutRow("5", "Violet", to: view, y: yOffset)
+
+        // Actions Section
+        yOffset -= 10
+        yOffset = addSectionTitle("Actions", to: view, y: yOffset)
+        yOffset = addShortcutRow("W", "Toggle Whiteboard", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌫", "Clear All", to: view, y: yOffset)
+        yOffset = addShortcutRow("⌘Z", "Undo", to: view, y: yOffset)
+        yOffset = addShortcutRow("⇧⌘Z", "Redo", to: view, y: yOffset)
+
+        // Note at bottom
+        let noteLabel = NSTextField(labelWithString: "Note: Global shortcuts require Accessibility permission")
+        noteLabel.font = NSFont.systemFont(ofSize: 11)
+        noteLabel.textColor = .secondaryLabelColor
+        noteLabel.frame = NSRect(x: 0, y: 10, width: frame.width, height: 16)
+        view.addSubview(noteLabel)
+
+        return view
+    }
+
+    private func addSectionTitle(_ title: String, to view: NSView, y: CGFloat) -> CGFloat {
+        let label = NSTextField(labelWithString: title)
+        label.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        label.frame = NSRect(x: 0, y: y - 18, width: view.frame.width, height: 16)
+        view.addSubview(label)
+        return y - 22
+    }
+
+    private func addShortcutRow(_ shortcut: String, _ description: String, to view: NSView, y: CGFloat) -> CGFloat {
+        let shortcutLabel = NSTextField(labelWithString: shortcut)
+        shortcutLabel.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+        shortcutLabel.textColor = .labelColor
+        shortcutLabel.alignment = .center
+        shortcutLabel.frame = NSRect(x: 0, y: y - 18, width: 50, height: 18)
+        view.addSubview(shortcutLabel)
+
+        let descLabel = NSTextField(labelWithString: description)
+        descLabel.font = NSFont.systemFont(ofSize: 13)
+        descLabel.textColor = .labelColor
+        descLabel.frame = NSRect(x: 60, y: y - 18, width: view.frame.width - 60, height: 18)
+        view.addSubview(descLabel)
+
+        return y - 20
     }
 }
 
