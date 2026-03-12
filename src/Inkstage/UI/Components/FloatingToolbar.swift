@@ -4,28 +4,29 @@ import SwiftUI
 // MARK: - Floating Toolbar Controller
 class FloatingToolbarController {
     static let shared = FloatingToolbarController()
-    
+
     private var toolbarWindow: NSPanel?
-    
+    private var toolbarView: NativeToolbarView?
+
     func show() {
         // Close existing
         hide()
-        
+
         let toolbarWidth: CGFloat = 480
         let toolbarHeight: CGFloat = 70
-        
+
         guard let screen = NSScreen.main else { return }
         let screenFrame = screen.frame
         let x = (screenFrame.width - toolbarWidth) / 2
         let y = screenFrame.height - toolbarHeight - 50
-        
+
         let panel = NSPanel(
             contentRect: NSRect(x: x, y: y, width: toolbarWidth, height: toolbarHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        
+
         // CRITICAL: Window level must be high enough to be above other windows
         // but not so high that it breaks event handling
         panel.level = .floating
@@ -34,18 +35,19 @@ class FloatingToolbarController {
         panel.hasShadow = true
         panel.ignoresMouseEvents = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        
+
         // IMPORTANT: Don't make key - let the annotation window keep focus
         // This allows both windows to work together
         panel.becomesKeyOnlyIfNeeded = true
-        
+
         // Use native NSView instead of SwiftUI for reliability
         let toolbarView = NativeToolbarView(frame: NSRect(x: 0, y: 0, width: toolbarWidth, height: toolbarHeight))
         panel.contentView = toolbarView
-        
+        self.toolbarView = toolbarView
+
         toolbarWindow = panel
         panel.orderFrontRegardless()
-        
+
         // Animate in
         panel.alphaValue = 0
         NSAnimationContext.runAnimationGroup { context in
@@ -53,44 +55,64 @@ class FloatingToolbarController {
             panel.animator().alphaValue = 1
         }
     }
-    
+
     func hide() {
         guard let panel = toolbarWindow else { return }
-        
+
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.15
             panel.animator().alphaValue = 0
         } completionHandler: { [weak self] in
             panel.orderOut(nil)
             self?.toolbarWindow = nil
+            self?.toolbarView = nil
         }
+    }
+
+    func updateAutoFadeButton() {
+        toolbarView?.updateAutoFadeButton()
     }
 }
 
 // MARK: - Native Toolbar View (Reliable)
 class NativeToolbarView: NSView {
-    
+
     private var toolButtons: [NSButton] = []
     private var colorButtons: [NSButton] = []
-    
+    private var autoFadeButton: NSButton?
+    private var cancellables = Set<AnyCancellable>()
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setupUI()
+
+        // Subscribe to auto-erase setting changes
+        SettingsManager.shared.$autoEraseEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateAutoFadeButton()
+            }
+            .store(in: &cancellables)
     }
-    
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     private func setupUI() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.95).cgColor
+        // Use a darker background to ensure visibility on white backgrounds (whiteboard)
+        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.85).cgColor
         layer?.cornerRadius = 12
         layer?.shadowColor = NSColor.black.cgColor
-        layer?.shadowOpacity = 0.3
+        layer?.shadowOpacity = 0.4
         layer?.shadowRadius = 10
         layer?.shadowOffset = CGSize(width: 0, height: 4)
-        
+
+        // Add a subtle border for better visibility
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.2).cgColor
+
         let tools: [(icon: String, tag: Int)] = [
             ("pencil", 0),      // Pen
             ("highlighter", 1), // Marker
@@ -100,100 +122,110 @@ class NativeToolbarView: NSView {
             ("textformat", 5),  // Text
             ("eraser", 6)       // Eraser
         ]
-        
+
         let buttonSize: CGFloat = 40
         let spacing: CGFloat = 8
         var xOffset: CGFloat = 16
-        
+
         // Add drag handle
         let handle = NSTextField(labelWithString: "≡")
         handle.font = NSFont.systemFont(ofSize: 20)
-        handle.textColor = .secondaryLabelColor
+        handle.textColor = .white
         handle.frame = NSRect(x: xOffset, y: 15, width: 24, height: 40)
         addSubview(handle)
         xOffset += 32
-        
+
         // Add separator
         let separator1 = NSBox()
         separator1.boxType = .separator
+        separator1.fillColor = NSColor.white.withAlphaComponent(0.3)
         separator1.frame = NSRect(x: xOffset, y: 18, width: 1, height: 34)
         addSubview(separator1)
         xOffset += 16
-        
+
         // Tool buttons
         for (index, tool) in tools.enumerated() {
             let button = createToolButton(icon: tool.icon, tag: tool.tag, selected: index == 0)
             button.frame = NSRect(x: xOffset, y: 15, width: buttonSize, height: buttonSize)
-            button.target = self
-            button.action = #selector(toolClicked(_:))
             addSubview(button)
             toolButtons.append(button)
             xOffset += buttonSize + spacing
         }
-        
+
         // Separator
         xOffset += 8
         let separator2 = NSBox()
         separator2.boxType = .separator
+        separator2.fillColor = NSColor.white.withAlphaComponent(0.3)
         separator2.frame = NSRect(x: xOffset, y: 18, width: 1, height: 34)
         addSubview(separator2)
         xOffset += 16
-        
+
         // Color buttons
         let colors: [NSColor] = [.systemYellow, .systemRed, .systemBlue, .systemGreen, .systemPurple]
         for (index, color) in colors.enumerated() {
             let button = createColorButton(color: color, tag: index)
             button.frame = NSRect(x: xOffset, y: 20, width: 30, height: 30)
-            button.target = self
-            button.action = #selector(colorClicked(_:))
             addSubview(button)
             colorButtons.append(button)
             xOffset += 34
         }
-        
+
         // Separator
         xOffset += 12
         let separator3 = NSBox()
         separator3.boxType = .separator
+        separator3.fillColor = NSColor.white.withAlphaComponent(0.3)
         separator3.frame = NSRect(x: xOffset, y: 18, width: 1, height: 34)
         addSubview(separator3)
         xOffset += 16
-        
+
         // Action buttons
         let undoButton = createActionButton(icon: "arrow.uturn.backward", action: #selector(undoClicked))
         undoButton.frame = NSRect(x: xOffset, y: 18, width: 34, height: 34)
         addSubview(undoButton)
         xOffset += 40
-        
+
         let closeButton = createActionButton(icon: "xmark", action: #selector(closeClicked))
         closeButton.frame = NSRect(x: xOffset, y: 18, width: 34, height: 34)
         addSubview(closeButton)
+        xOffset += 40
+
+        // Auto-fade toggle button
+        let fadeButton = createAutoFadeButton()
+        fadeButton.frame = NSRect(x: xOffset, y: 18, width: 34, height: 34)
+        addSubview(fadeButton)
+        autoFadeButton = fadeButton
     }
-    
+
     private func createToolButton(icon: String, tag: Int, selected: Bool) -> NSButton {
         let button = NSButton(frame: NSRect(x: 0, y: 0, width: 40, height: 40))
         button.bezelStyle = .rounded
-        button.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
+        let image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
+        button.image = image
         button.imageScaling = .scaleProportionallyUpOrDown
         button.imagePosition = .imageOnly
         button.tag = tag
         button.wantsLayer = true
         button.layer?.cornerRadius = 8
         button.isEnabled = true
-        
+
+        // White icons for visibility on dark background
+        button.contentTintColor = .white
+
         // Explicitly set target and action to ensure clickability
         button.target = self
         button.action = #selector(toolClicked(_:))
-        
+
         if selected {
-            button.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.cgColor
+            button.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.3).cgColor
         } else {
             button.layer?.backgroundColor = NSColor.clear.cgColor
         }
-        
+
         return button
     }
-    
+
     private func createColorButton(color: NSColor, tag: Int) -> NSButton {
         let button = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
         button.bezelStyle = .rounded
@@ -205,14 +237,14 @@ class NativeToolbarView: NSView {
         button.layer?.borderColor = NSColor.white.cgColor
         button.tag = tag
         button.isEnabled = true
-        
+
         // Explicitly set target and action
         button.target = self
         button.action = #selector(colorClicked(_:))
-        
+
         return button
     }
-    
+
     private func createActionButton(icon: String, action: Selector) -> NSButton {
         let button = NSButton(frame: NSRect(x: 0, y: 0, width: 34, height: 34))
         button.bezelStyle = .rounded
@@ -221,43 +253,88 @@ class NativeToolbarView: NSView {
         button.imagePosition = .imageOnly
         button.wantsLayer = true
         button.layer?.cornerRadius = 6
-        button.layer?.backgroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.1).cgColor
+        button.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.15).cgColor
         button.isEnabled = true
-        
+
+        // White icons for visibility
+        button.contentTintColor = .white
+
         // Explicitly set target and action
         button.target = self
         button.action = action
-        
+
         return button
     }
-    
+
+    private func createAutoFadeButton() -> NSButton {
+        let isEnabled = SettingsManager.shared.autoEraseEnabled
+        let icon = isEnabled ? "timer" : "timer.slash"
+        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 34, height: 34))
+        button.bezelStyle = .rounded
+        button.image = NSImage(systemSymbolName: icon, accessibilityDescription: "Auto Fade")
+        button.imageScaling = .scaleProportionallyUpOrDown
+        button.imagePosition = .imageOnly
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 6
+        button.isEnabled = true
+        button.toolTip = isEnabled ? "Auto-fade ON (Click to disable)" : "Auto-fade OFF (Click to enable)"
+
+        // Set colors based on state
+        updateAutoFadeButtonAppearance(button)
+
+        // Explicitly set target and action
+        button.target = self
+        button.action = #selector(autoFadeClicked(_:))
+
+        return button
+    }
+
+    private func updateAutoFadeButtonAppearance(_ button: NSButton) {
+        let isEnabled = SettingsManager.shared.autoEraseEnabled
+        if isEnabled {
+            button.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.5).cgColor
+            button.contentTintColor = .white
+        } else {
+            button.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.15).cgColor
+            button.contentTintColor = .secondaryLabelColor
+        }
+    }
+
+    func updateAutoFadeButton() {
+        guard let button = autoFadeButton else { return }
+        let isEnabled = SettingsManager.shared.autoEraseEnabled
+        button.image = NSImage(systemSymbolName: isEnabled ? "timer" : "timer.slash", accessibilityDescription: "Auto Fade")
+        button.toolTip = isEnabled ? "Auto-fade ON (Click to disable)" : "Auto-fade OFF (Click to enable)"
+        updateAutoFadeButtonAppearance(button)
+    }
+
     @objc private func toolClicked(_ sender: NSButton) {
         let tools: [DrawingToolType] = [.pen, .marker, .line, .rectangle, .circle, .text, .eraser]
         if sender.tag < tools.count {
             ToolSettings.shared.currentTool = tools[sender.tag]
             print("🛠️ Tool: \(tools[sender.tag])")
-            
+
             // Update visual selection
             for (index, button) in toolButtons.enumerated() {
                 if index == sender.tag {
-                    button.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.cgColor
+                    button.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.3).cgColor
                 } else {
                     button.layer?.backgroundColor = NSColor.clear.cgColor
                 }
             }
         }
     }
-    
+
     @objc private func colorClicked(_ sender: NSButton) {
         let colors: [NSColor] = [.systemYellow, .systemRed, .systemBlue, .systemGreen, .systemPurple]
         if sender.tag < colors.count {
             SettingsManager.shared.penColor = colors[sender.tag]
             print("🎨 Color: \(colors[sender.tag])")
-            
+
             // Update visual selection
             for (index, button) in colorButtons.enumerated() {
                 if index == sender.tag {
-                    button.layer?.borderColor = NSColor.selectedContentBackgroundColor.cgColor
+                    button.layer?.borderColor = NSColor.white.cgColor
                     button.layer?.borderWidth = 3
                 } else {
                     button.layer?.borderColor = NSColor.white.cgColor
@@ -266,12 +343,22 @@ class NativeToolbarView: NSView {
             }
         }
     }
-    
+
     @objc private func undoClicked() {
         OverlayWindowManager.shared.undo()
     }
-    
+
     @objc private func closeClicked() {
         AppStateManager.shared.handleEscape()
+    }
+
+    @objc private func autoFadeClicked(_ sender: NSButton) {
+        let newValue = !SettingsManager.shared.autoEraseEnabled
+        SettingsManager.shared.autoEraseEnabled = newValue
+        print("⏱️ Auto-fade: \(newValue ? "ON" : "OFF")")
+        updateAutoFadeButton()
+
+        // Show toast notification
+        ToastManager.shared.show(message: newValue ? "⏱️ Auto-fade ON" : "⏱️ Auto-fade OFF")
     }
 }
