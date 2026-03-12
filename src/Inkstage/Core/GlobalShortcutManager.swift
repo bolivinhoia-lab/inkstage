@@ -63,7 +63,50 @@ class GlobalShortcutManager {
             }
             return true
         }
-        
+
+        // Global mode shortcuts (⌘⇧A, ⌘⇧C, ⌘⇧S, ⌘⇧Z, ⌘⇧W)
+        // Note: These require the app to be active OR use CGEventTap for true global
+        // For now, we handle them when app is active via local monitor
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let isCmdShift = modifiers == [.command, .shift]
+
+        if isCmdShift {
+            switch event.keyCode {
+            case 0: // A - Drawing
+                print("🎯 ⌘⇧A pressed - toggle drawing")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleDrawing()
+                }
+                return true
+            case 8: // C - Cursor Highlight
+                print("🎯 ⌘⇧C pressed - toggle cursor highlight")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleCursorHighlight()
+                }
+                return true
+            case 1: // S - Spotlight
+                print("🎯 ⌘⇧S pressed - toggle spotlight")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleSpotlight()
+                }
+                return true
+            case 6: // Z - Zoom
+                print("🎯 ⌘⇧Z pressed - toggle zoom")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleZoom()
+                }
+                return true
+            case 13: // W - Whiteboard
+                print("🎯 ⌘⇧W pressed - toggle whiteboard")
+                DispatchQueue.main.async {
+                    AppStateManager.shared.toggleWhiteboard()
+                }
+                return true
+            default:
+                break
+            }
+        }
+
         // Only handle tool shortcuts if in drawing mode
         guard AppStateManager.shared.isDrawing else { return false }
 
@@ -98,4 +141,14 @@ class GlobalShortcutManager {
 // MARK: - NSEvent Key Codes
 extension NSEvent {
     static let escKeyCode: UInt16 = 53
+
+    // Modifier flags
+    static let cmdShift: NSEvent.ModifierFlags = [.command, .shift]
+
+    // Key codes for global shortcuts
+    static let aKeyCode: UInt16 = 0
+    static let cKeyCode: UInt16 = 8
+    static let sKeyCode: UInt16 = 1
+    static let zKeyCode: UInt16 = 6
+    static let wKeyCode: UInt16 = 13
 }
