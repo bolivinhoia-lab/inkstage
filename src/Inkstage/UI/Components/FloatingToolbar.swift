@@ -26,19 +26,25 @@ class FloatingToolbarController {
             defer: false
         )
         
-        panel.level = .statusBar + 1
+        // CRITICAL: Window level must be high enough to be above other windows
+        // but not so high that it breaks event handling
+        panel.level = .floating
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
         panel.ignoresMouseEvents = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        
+        // IMPORTANT: Don't make key - let the annotation window keep focus
+        // This allows both windows to work together
+        panel.becomesKeyOnlyIfNeeded = true
         
         // Use native NSView instead of SwiftUI for reliability
         let toolbarView = NativeToolbarView(frame: NSRect(x: 0, y: 0, width: toolbarWidth, height: toolbarHeight))
         panel.contentView = toolbarView
         
         toolbarWindow = panel
-        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
         
         // Animate in
         panel.alphaValue = 0
@@ -154,28 +160,30 @@ class NativeToolbarView: NSView {
         xOffset += 16
         
         // Action buttons
-        let undoButton = createActionButton(icon: "arrow.uturn.backward")
+        let undoButton = createActionButton(icon: "arrow.uturn.backward", action: #selector(undoClicked))
         undoButton.frame = NSRect(x: xOffset, y: 18, width: 34, height: 34)
-        undoButton.target = self
-        undoButton.action = #selector(undoClicked)
         addSubview(undoButton)
         xOffset += 40
         
-        let closeButton = createActionButton(icon: "xmark")
+        let closeButton = createActionButton(icon: "xmark", action: #selector(closeClicked))
         closeButton.frame = NSRect(x: xOffset, y: 18, width: 34, height: 34)
-        closeButton.target = self
-        closeButton.action = #selector(closeClicked)
         addSubview(closeButton)
     }
     
     private func createToolButton(icon: String, tag: Int, selected: Bool) -> NSButton {
-        let button = NSButton()
+        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 40, height: 40))
         button.bezelStyle = .rounded
         button.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
         button.imageScaling = .scaleProportionallyUpOrDown
+        button.imagePosition = .imageOnly
         button.tag = tag
         button.wantsLayer = true
         button.layer?.cornerRadius = 8
+        button.isEnabled = true
+        
+        // Explicitly set target and action to ensure clickability
+        button.target = self
+        button.action = #selector(toolClicked(_:))
         
         if selected {
             button.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.cgColor
@@ -187,25 +195,39 @@ class NativeToolbarView: NSView {
     }
     
     private func createColorButton(color: NSColor, tag: Int) -> NSButton {
-        let button = NSButton()
+        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 30, height: 30))
         button.bezelStyle = .rounded
+        button.title = ""
         button.wantsLayer = true
         button.layer?.cornerRadius = 15
         button.layer?.backgroundColor = color.cgColor
         button.layer?.borderWidth = 2
         button.layer?.borderColor = NSColor.white.cgColor
         button.tag = tag
+        button.isEnabled = true
+        
+        // Explicitly set target and action
+        button.target = self
+        button.action = #selector(colorClicked(_:))
+        
         return button
     }
     
-    private func createActionButton(icon: String) -> NSButton {
-        let button = NSButton()
+    private func createActionButton(icon: String, action: Selector) -> NSButton {
+        let button = NSButton(frame: NSRect(x: 0, y: 0, width: 34, height: 34))
         button.bezelStyle = .rounded
         button.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
         button.imageScaling = .scaleProportionallyUpOrDown
+        button.imagePosition = .imageOnly
         button.wantsLayer = true
         button.layer?.cornerRadius = 6
         button.layer?.backgroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.1).cgColor
+        button.isEnabled = true
+        
+        // Explicitly set target and action
+        button.target = self
+        button.action = action
+        
         return button
     }
     
