@@ -65,9 +65,14 @@ class DrawingView: NSView {
     var onRightClick: (() -> Void)?
 
     private var strokes: [DrawingStroke] = []
+    private var undoneStrokes: [DrawingStroke] = []
     private var currentStroke: DrawingStroke?
     private var shapeStartPoint: NSPoint?
     private var activeTextField: NSTextField?
+    
+    var isEditingText: Bool {
+        return activeTextField != nil
+    }
 
     private var settings: ToolSettings { ToolSettings.shared }
     private var displayLink: CVDisplayLink?
@@ -92,7 +97,9 @@ class DrawingView: NSView {
     }
 
     deinit {
-        displayLink?.stop()
+        if let link = displayLink {
+            CVDisplayLinkStop(link)
+        }
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
@@ -159,6 +166,9 @@ class DrawingView: NSView {
 
     // MARK: - Freehand Drawing
     private func startFreehand(at point: NSPoint) {
+        // Clear redo stack when starting a new stroke
+        undoneStrokes.removeAll()
+        
         let path = NSBezierPath()
         path.lineWidth = settings.currentWidth
         path.lineCapStyle = .round
@@ -364,6 +374,7 @@ class DrawingView: NSView {
     // MARK: - Actions
     func clear() {
         strokes.forEach { $0.cancelFade() }
+        undoneStrokes.removeAll()
         strokes.removeAll()
         clearCurrentTextField()
         needsDisplay = true
@@ -371,8 +382,16 @@ class DrawingView: NSView {
 
     func undo() {
         guard !strokes.isEmpty else { return }
-        strokes.last?.cancelFade()
-        strokes.removeLast()
+        let stroke = strokes.removeLast()
+        stroke.cancelFade()
+        undoneStrokes.append(stroke)
+        needsDisplay = true
+    }
+    
+    func redo() {
+        guard !undoneStrokes.isEmpty else { return }
+        let stroke = undoneStrokes.removeLast()
+        strokes.append(stroke)
         needsDisplay = true
     }
 }
