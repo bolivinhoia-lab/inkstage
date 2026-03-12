@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 // MARK: - Floating Toolbar Controller
 class FloatingToolbarController {
@@ -12,7 +13,7 @@ class FloatingToolbarController {
         // Close existing
         hide()
 
-        let toolbarWidth: CGFloat = 480
+        let toolbarWidth: CGFloat = 520  // Increased for auto-fade button
         let toolbarHeight: CGFloat = 70
 
         guard let screen = NSScreen.main else { return }
