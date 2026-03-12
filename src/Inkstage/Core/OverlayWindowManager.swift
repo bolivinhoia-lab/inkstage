@@ -49,11 +49,15 @@ class OverlayWindowManager: NSObject, NSWindowDelegate {
     func activateDrawingMode() {
         annotationWindow?.ignoresMouseEvents = false
         drawingView?.isDrawingEnabled = true
+        
+        // CRITICAL: Ensure window can receive keyboard events
         if let window = annotationWindow {
+            window.makeKey()
             window.makeFirstResponder(drawingView)
+            print("🔑 Annotation window made key, drawingView is first responder")
         }
         
-        // Show the new floating toolbar
+        // Show the floating toolbar
         FloatingToolbarController.shared.show()
         
         NSCursor.crosshair.push()

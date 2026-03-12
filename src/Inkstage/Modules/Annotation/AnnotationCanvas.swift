@@ -234,8 +234,16 @@ class DrawingView: NSView {
     
     // MARK: - Keyboard
     override func keyDown(with event: NSEvent) {
+        print("🔑 DrawingView.keyDown - keyCode: \(event.keyCode)")
+        
         if event.keyCode == 53 { // ESC
-            onEscapePressed?()
+            if activeTextField != nil {
+                print("📝 Dismissing active text field")
+                clearCurrentTextField()
+            } else {
+                print("🎯 ESC in DrawingView - calling onEscapePressed")
+                onEscapePressed?()
+            }
             return
         }
         super.keyDown(with: event)
