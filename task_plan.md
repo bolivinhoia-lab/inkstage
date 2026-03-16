@@ -22,17 +22,17 @@
 **Estilo:** Frosted Glass Pill + SF Symbols
 
 **Tarefas:**
-- [ ] Implementar NSVisualEffectView com .hudWindow
-- [ ] Adicionar drag handle (≡) com SF Symbol
-- [ ] Reorganizar layout: [handle] | [colors] | [separator] | [tools] | [separator] | [actions]
-- [ ] 5 cores favoritas (ciano, rose, lime, amarelo, violeta)
-- [ ] Ferramentas: Pen, Arrow, Rectangle, Circle, Text
-- [ ] Ações: Undo, Clear, Auto-fade, Close
-- [ ] Animações de hover (scale 1.1, opacity)
-- [ ] Animações de press (scale 0.92 bounce)
-- [ ] Cantos arredondados generosos (20px)
-- [ ] Sombra suave (blur 20, offset 0,8)
-- [ ] Magnetic snap para edges
+- [x] Implementar NSVisualEffectView com .hudWindow
+- [x] Adicionar drag handle (≡) com SF Symbol
+- [x] Reorganizar layout: [handle] | [colors] | [separator] | [tools] | [separator] | [actions]
+- [x] 5 cores favoritas (ciano, rose, lime, amarelo, violeta)
+- [x] Ferramentas: Pen, Arrow, Rectangle, Circle, Text
+- [x] Ações: Undo, Clear, Auto-fade, Close
+- [x] Animações de hover (scale 1.1, opacity)
+- [x] Animações de press (scale 0.92 bounce)
+- [x] Cantos arredondados generosos (20px)
+- [x] Sombra suave (blur 20, offset 0,8)
+- [x] Magnetic snap para edges
 
 **Arquivos:**
 - `src/Inkstage/UI/Components/FloatingToolbar.swift`
@@ -43,19 +43,19 @@
 **Base:** Presentify shortcuts
 
 **Tarefas:**
-- [ ] Implementar ⌃A (Annotate Screen)
-- [ ] Implementar ⌃⌥A (Annotate No Controls)
-- [ ] Implementar ⌃S (Highlight Cursor)
-- [ ] Implementar ⌃L (Spotlight Cursor)
-- [ ] Implementar ⌃Z (Zoom Cursor)
-- [ ] Implementar / (Show Shortcuts Helper)
-- [ ] Implementar 1-5 (Color shortcuts)
-- [ ] Implementar F, A, R, C, T (Tool shortcuts)
-- [ ] Implementar W (Toggle Whiteboard)
-- [ ] Implementar ESC (Exit Mode)
-- [ ] Implementar Fn hold (Interactive Mode)
-- [ ] Criar Shortcut Helper Overlay (pressionar "/")
-- [ ] Persistir shortcuts customizados
+- [x] Implementar ⌃A (Annotate Screen)
+- [x] Implementar ⌃⌥A (Annotate No Controls)
+- [x] Implementar ⌃S (Highlight Cursor)
+- [x] Implementar ⌃L (Spotlight Cursor)
+- [x] Implementar ⌃Z (Zoom Cursor)
+- [x] Implementar / (Show Shortcuts Helper)
+- [x] Implementar 1-5 (Color shortcuts)
+- [x] Implementar F, A, R, C, T (Tool shortcuts)
+- [x] Implementar W (Toggle Whiteboard)
+- [x] Implementar ESC (Exit Mode)
+- [x] Implementar Fn hold (Interactive Mode)
+- [x] Criar Shortcut Helper Overlay (pressionar "/")
+- [x] Persistir shortcuts customizados
 
 **Arquivos:**
 - `src/Inkstage/Core/GlobalShortcutManager.swift`
