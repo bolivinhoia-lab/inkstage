@@ -21,6 +21,18 @@ class SettingsManager: ObservableObject {
     }
     
     // Cores disponíveis
+    @Published var startAtLogin: Bool = false { didSet { UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin") } }
+    @Published var highlightAtLogin: Bool = false { didSet { UserDefaults.standard.set(highlightAtLogin, forKey: "highlightAtLogin") } }
+    @Published var whiteboardColor: NSColor = .white { didSet { saveColor(whiteboardColor, forKey: "whiteboardColor") } }
+    @Published var cursorHighlightOpacity: Double = 0.5 { didSet { UserDefaults.standard.set(cursorHighlightOpacity, forKey: "cursorHighlightOpacity") } }
+    @Published var cursorHighlightSize: Double = 50.0 { didSet { UserDefaults.standard.set(cursorHighlightSize, forKey: "cursorHighlightSize") } }
+    @Published var cursorHighlightColor: NSColor = .systemYellow { didSet { saveColor(cursorHighlightColor, forKey: "cursorHighlightColor") } }
+    @Published var spotlightSize: Double = 150.0 { didSet { UserDefaults.standard.set(spotlightSize, forKey: "spotlightSize") } }
+    @Published var spotlightOpacity: Double = 0.5 { didSet { UserDefaults.standard.set(spotlightOpacity, forKey: "spotlightOpacity") } }
+    @Published var zoomLevel: Double = 2.0 { didSet { UserDefaults.standard.set(zoomLevel, forKey: "zoomLevel") } }
+    @Published var zoomWindowSize: Double = 200.0 { didSet { UserDefaults.standard.set(zoomWindowSize, forKey: "zoomWindowSize") } }
+    @Published var zoomShape: String = "circle" { didSet { UserDefaults.standard.set(zoomShape, forKey: "zoomShape") } }
+
     let availableColors: [(name: String, color: NSColor)] = [
         ("Yellow", .systemYellow),
         ("Red", .systemRed),

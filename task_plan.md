@@ -67,14 +67,14 @@
 **Estilo:** macOS Settings App
 
 **Tarefas:**
-- [ ] Criar janela 700x500 com toolbarStyle .preference
-- [ ] Tab: General (Start at login, About, Restore Defaults)
-- [ ] Tab: Annotate (Colors, Line Weight, Whiteboard Color, Text settings, Auto-erase)
-- [ ] Tab: Cursor (Highlight, Spotlight, Zoom settings)
-- [ ] Tab: Shortcuts (Lista de shortcuts configuráveis)
-- [ ] Tab: About (Logo, version, links)
-- [ ] Conectar tudo com UserDefaults
-- [ ] Adicionar preview ao vivo das configurações
+- [x] Criar janela 700x500 com toolbarStyle .preference
+- [x] Tab: General (Start at login, About, Restore Defaults)
+- [x] Tab: Annotate (Colors, Line Weight, Whiteboard Color, Text settings, Auto-erase)
+- [x] Tab: Cursor (Highlight, Spotlight, Zoom settings)
+- [x] Tab: Shortcuts (Lista de shortcuts configuráveis)
+- [x] Tab: About (Logo, version, links)
+- [x] Conectar tudo com UserDefaults
+- [x] Adicionar preview ao vivo das configurações
 
 **Arquivos:**
 - `src/Inkstage/UI/Preferences/PreferencesWindow.swift`
