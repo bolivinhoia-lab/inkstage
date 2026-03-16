@@ -59,6 +59,14 @@ echo "🎨 Criando DMG profissional..."
 create-dmg \
     --volname "$VOLUME_NAME" \
     --volicon "$ICONS_FILE" \
+    --background "build/dmg-background.png" \
+    --window-pos 200 120 \
+    --window-size 600 400 \
+    --icon-size 100 \
+    --icon "Inkstage.app" 150 190 \
+    --hide-extension "Inkstage.app" \
+    --app-drop-link 450 190 \
+
     --skip-jenkins \
     --format UDZO \
     "$DMG_NAME" \

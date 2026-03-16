@@ -103,10 +103,10 @@
 ### Phase 5: DMG Installer Moderno (BAIXA)
 
 **Tarefas:**
-- [ ] Criar background com gradiente escuro
-- [ ] Ícone do app com sombra suave
-- [ ] Seta animada entre app e Applications
-- [ ] Texto "Drag to install"
+- [x] Criar background com gradiente escuro
+- [x] Ícone do app com sombra suave
+- [x] Seta animada entre app e Applications
+- [x] Texto "Drag to install"
 
 **Arquivos:**
 - `build/dmg-background.png`
