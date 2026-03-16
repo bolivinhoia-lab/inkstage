@@ -181,51 +181,37 @@ class ToastManager {
     private var hideTimer: Timer?
 
     func show(message: String, duration: TimeInterval = 1.5) {
-        // Cancela timer anterior
         hideTimer?.invalidate()
-
-        // Fecha toast anterior
         toastWindow?.orderOut(nil)
-
         guard let screen = NSScreen.main else { return }
-
         let label = NSTextField(labelWithString: message)
         label.font = NSFont.systemFont(ofSize: 16, weight: .medium)
         label.textColor = .white
         label.sizeToFit()
-
         let padding: CGFloat = 20
         let width = label.frame.width + padding * 2
         let height: CGFloat = 44
-
         let screenRect = screen.frame
         let x = (screenRect.width - width) / 2
         let y = screenRect.height - 100
-
-        let panel = NSPanel(
-            contentRect: NSRect(x: x, y: y, width: width, height: height),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-
+        let panel = NSPanel(contentRect: NSRect(x: x, y: y, width: width, height: height), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .statusBar + 10
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
-
-        // Container com fundo escuro arredondado
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        let container = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        container.material = .hudWindow
+        container.state = .active
+        container.blendingMode = .behindWindow
         container.wantsLayer = true
-        container.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.8).cgColor
         container.layer?.cornerRadius = height / 2
-
+        container.layer?.borderWidth = 0.5
+        container.layer?.borderColor = NSColor.white.withAlphaComponent(0.1).cgColor
         label.frame.origin = NSPoint(x: padding, y: (height - label.frame.height) / 2)
         container.addSubview(label)
-
         panel.contentView = container
-
         toastWindow = panel
+
         panel.makeKeyAndOrderFront(nil)
 
         // Animação de entrada

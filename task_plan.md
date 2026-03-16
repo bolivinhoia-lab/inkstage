@@ -88,12 +88,12 @@
 ### Phase 4: Animations & Polish (MÉDIA)
 
 **Tarefas:**
-- [ ] Toolbar entry animation (fade + slide up)
-- [ ] Button press animations (scale bounce)
-- [ ] Color selection glow effect
-- [ ] Mode transition cross-fade
-- [ ] Toast notifications estilizadas
-- [ ] Loading states sutis
+- [x] Toolbar entry animation (fade + slide up)
+- [x] Button press animations (scale bounce)
+- [x] Color selection glow effect
+- [x] Mode transition cross-fade
+- [x] Toast notifications estilizadas
+- [x] Loading states sutis
 
 **Arquivos:**
 - `src/Inkstage/Core/AnimationManager.swift` (novo)
